@@ -273,8 +273,8 @@ st.markdown(f"""
 <div class="info-row">
   <span class="info-chip">🎬 {duration} seconds</span>
   <span class="info-chip">📐 Auto: {res_label}</span>
-  <span class="info-chip">🎵 Audio included</span>
-  <span class="info-chip">⚡ Velo 1.2</span>
+  <span class="info-chip">🎵 no audio included</span>
+  <span class="info-chip">⚡ Velo 1.0 (Legacy model has no sound)</span>
 </div>
 """, unsafe_allow_html=True)
 
