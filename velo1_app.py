@@ -1,0 +1,423 @@
+"""
+velo1_app.py - Velo 1.2 Streamlit Web App
+Built by BotDevelopmentAI
+-------------------------------------------
+Deploy to Streamlit Cloud: https://streamlit.io/cloud
+
+When your ngrok URL changes update the one line below and commit to GitHub.
+"""
+
+import streamlit as st
+import requests
+import time
+import base64
+from io import BytesIO
+
+# ══════════════════════════════════════════════════════════════════
+#  ↓↓↓  ONLY LINE YOU EVER NEED TO CHANGE  ↓↓↓
+SERVER_URL = "https://YOUR-URL-HERE.ngrok-free.app"
+#  ↑↑↑  PASTE YOUR NGROK URL ABOVE  ↑↑↑
+# ══════════════════════════════════════════════════════════════════
+
+st.set_page_config(
+    page_title="Velo 1.2 — BotDevelopmentAI",
+    page_icon="🎬",
+    layout="centered",
+)
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Mono', monospace;
+    background-color: #080808;
+    color: #f0f0f0;
+}
+.stApp { background-color: #080808; }
+h1,h2,h3 { font-family: 'Syne', sans-serif !important; }
+#MainMenu, footer, header { visibility: hidden; }
+
+.velo-header { text-align: center; padding: 32px 0 8px; }
+.velo-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 52px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #00d4ff, #7b2fff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -2px;
+    line-height: 1;
+}
+.velo-sub {
+    font-size: 12px;
+    color: #555;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 6px;
+}
+.ring-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 0;
+}
+.ring-container { position: relative; width: 120px; height: 120px; }
+.ring-svg { transform: rotate(-90deg); }
+.ring-bg  { fill: none; stroke: #222; stroke-width: 6; }
+.ring-fill {
+    fill: none;
+    stroke: url(#ringGrad);
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s ease;
+}
+.ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+}
+.ring-pct    { font-size: 22px; color: #00d4ff; line-height: 1; }
+.ring-status { font-size: 9px; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+.ring-caption { margin-top: 16px; font-size: 12px; color: #555; text-align: center; letter-spacing: 1px; }
+
+.res-badge {
+    display: inline-block;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #00d4ff;
+    letter-spacing: 1px;
+    margin-top: 8px;
+}
+
+.stButton > button {
+    width: 100%;
+    background: linear-gradient(135deg, #00d4ff, #7b2fff) !important;
+    color: white !important;
+    font-family: 'Syne', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    letter-spacing: 1px !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 14px !important;
+}
+.cancel-btn > button {
+    background: #1a1a1a !important;
+    border: 1px solid #333 !important;
+    color: #888 !important;
+}
+.dl-btn {
+    display: block;
+    padding: 12px 32px;
+    background: linear-gradient(135deg, #00d4ff, #7b2fff);
+    color: white !important;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1px;
+    border-radius: 12px;
+    text-decoration: none;
+    text-align: center;
+    margin-top: 12px;
+}
+.offline-msg {
+    text-align: center;
+    padding: 32px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 16px;
+    color: #555;
+    font-size: 13px;
+}
+.info-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+.info-chip {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 1px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ── Helpers ─────────────────────────────────────────────────────────
+def progress_ring(pct: int, status_text: str, caption: str = "") -> str:
+    r      = 52
+    circ   = 2 * 3.14159 * r
+    offset = circ * (1 - pct / 100)
+    return f"""
+    <div class="ring-wrap">
+      <div class="ring-container">
+        <svg class="ring-svg" width="120" height="120" viewBox="0 0 120 120">
+          <defs>
+            <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#00d4ff"/>
+              <stop offset="100%" stop-color="#7b2fff"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg"   cx="60" cy="60" r="{r}"/>
+          <circle class="ring-fill" cx="60" cy="60" r="{r}"
+            stroke-dasharray="{circ:.1f}"
+            stroke-dashoffset="{offset:.1f}"/>
+        </svg>
+        <div class="ring-label">
+          <span class="ring-pct">{pct}%</span>
+          <span class="ring-status">{status_text}</span>
+        </div>
+      </div>
+      <div class="ring-caption">{caption}</div>
+    </div>
+    """
+
+def get_download_link(b64_str: str) -> str:
+    data     = b64_str.split(",")[1] if "," in b64_str else b64_str
+    filename = f"velo1_{int(time.time())}.mp4"
+    return f'<a class="dl-btn" href="data:video/mp4;base64,{data}" download="{filename}">⬇ Download Video</a>'
+
+def safe_resolution_label(duration: int) -> str:
+    if duration <= 8:   return "720p"
+    elif duration <= 12: return "540p"
+    else:               return "480p"
+
+def server_online() -> bool:
+    try:
+        r = requests.get(f"{SERVER_URL}/health", timeout=4)
+        return r.status_code == 200
+    except:
+        return False
+
+
+# ── Session state ────────────────────────────────────────────────────
+for key, default in {
+    "job_id":      None,
+    "last_video":  None,
+    "history":     [],
+    "generating":  False,
+    "last_prompt": "",
+    "last_res":    "",
+    "last_dur":    5,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+
+# ── Header ───────────────────────────────────────────────────────────
+st.markdown("""
+<div class="velo-header">
+  <div class="velo-title">Velo 1.2</div>
+  <div class="velo-sub">Video Generator · BotDevelopmentAI</div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# ── Offline check ────────────────────────────────────────────────────
+if not server_online():
+    st.markdown("""
+    <div class="offline-msg">
+      ⚠️ Generator is currently offline.<br>
+      <span style="font-size:11px;color:#444">The BotDevelopmentAI team will have it back up soon.</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
+
+
+# ── Controls ─────────────────────────────────────────────────────────
+st.markdown("### ✏️ Describe your video")
+
+prompt = st.text_area(
+    "Prompt",
+    placeholder="A cinematic shot of ocean waves crashing on rocks at sunset, golden hour lighting, slow motion, photorealistic...",
+    height=120,
+    label_visibility="collapsed",
+    disabled=st.session_state.generating,
+)
+
+neg_prompt = st.text_area(
+    "Negative prompt",
+    value="blurry, low quality, distorted, watermark, text, ugly",
+    height=68,
+    disabled=st.session_state.generating,
+)
+
+duration = st.slider(
+    "Duration (seconds)",
+    min_value=5,
+    max_value=15,
+    value=5,
+    disabled=st.session_state.generating,
+)
+
+# Show auto resolution info
+res_label = safe_resolution_label(duration)
+st.markdown(f"""
+<div class="info-row">
+  <span class="info-chip">🎬 {duration} seconds</span>
+  <span class="info-chip">📐 Auto: {res_label}</span>
+  <span class="info-chip">🎵 Audio included</span>
+  <span class="info-chip">⚡ LTX-2 distilled FP8</span>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("")
+
+# Generate / Cancel
+if not st.session_state.generating:
+    generate_clicked = st.button("🎬 GENERATE VIDEO")
+    cancel_clicked   = False
+else:
+    generate_clicked = False
+    st.markdown('<div class="cancel-btn">', unsafe_allow_html=True)
+    cancel_clicked = st.button("✕ CANCEL")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Submit ───────────────────────────────────────────────────────────
+if generate_clicked:
+    if not prompt.strip():
+        st.error("Please enter a prompt!")
+    else:
+        try:
+            res = requests.post(
+                f"{SERVER_URL}/generate",
+                json={
+                    "prompt":          prompt,
+                    "negative_prompt": neg_prompt,
+                    "duration":        duration,
+                },
+                timeout=10,
+            )
+            data = res.json()
+            st.session_state.job_id      = data["job_id"]
+            st.session_state.last_prompt = prompt
+            st.session_state.last_res    = data.get("resolution", res_label)
+            st.session_state.last_dur    = duration
+            st.session_state.generating  = True
+            st.session_state.last_video  = None
+            st.rerun()
+        except Exception as e:
+            st.error(f"Could not reach server: {e}")
+
+# ── Cancel ───────────────────────────────────────────────────────────
+if cancel_clicked:
+    try:
+        requests.post(f"{SERVER_URL}/cancel/{st.session_state.job_id}", timeout=3)
+    except:
+        pass
+    st.session_state.generating = False
+    st.session_state.job_id     = None
+    st.info("Generation cancelled.")
+    st.rerun()
+
+
+# ── Poll ─────────────────────────────────────────────────────────────
+if st.session_state.job_id and st.session_state.generating:
+    output_slot = st.empty()
+
+    try:
+        res    = requests.get(f"{SERVER_URL}/status/{st.session_state.job_id}", timeout=5)
+        status = res.json()
+        s      = status.get("status", "queued")
+        pct    = status.get("progress", 0)
+
+        if s == "queued":
+            pos = status.get("queue_pos", "?")
+            output_slot.markdown(
+                progress_ring(10, "QUEUED", f"Position {pos} in queue — waiting for GPU..."),
+                unsafe_allow_html=True,
+            )
+            time.sleep(30)
+            st.rerun()
+
+        elif s == "generating":
+            pct = max(5, pct)
+            output_slot.markdown(
+                progress_ring(pct, "GENERATING", f"Creating your {st.session_state.last_dur}s video at {st.session_state.last_res}..."),
+                unsafe_allow_html=True,
+            )
+            time.sleep(30)
+            st.rerun()
+
+        elif s == "done":
+            output_slot.markdown(progress_ring(100, "DONE", ""), unsafe_allow_html=True)
+            time.sleep(0.4)
+            output_slot.empty()
+            st.session_state.last_video = status["video"]
+            st.session_state.history.insert(0, {
+                "video":  status["video"],
+                "prompt": st.session_state.last_prompt,
+                "res":    status.get("resolution", ""),
+                "dur":    status.get("duration", 5),
+            })
+            if len(st.session_state.history) > 6:
+                st.session_state.history = st.session_state.history[:6]
+            st.session_state.job_id     = None
+            st.session_state.generating = False
+            st.rerun()
+
+        elif s == "error":
+            st.error(f"Generation failed: {status.get('error', 'unknown error')}")
+            st.session_state.job_id     = None
+            st.session_state.generating = False
+            st.rerun()
+
+        elif s == "cancelled":
+            st.session_state.job_id     = None
+            st.session_state.generating = False
+            st.rerun()
+
+    except Exception as e:
+        st.warning(f"Waiting for server... ({e})")
+        time.sleep(30)
+        st.rerun()
+
+
+# ── Show video ───────────────────────────────────────────────────────
+if st.session_state.last_video and not st.session_state.generating:
+    st.markdown("### 🎬 Result")
+    video_data = st.session_state.last_video.split(",")[1]
+    st.video(BytesIO(base64.b64decode(video_data)))
+    st.markdown(get_download_link(st.session_state.last_video), unsafe_allow_html=True)
+
+    if st.button("Generate another"):
+        st.session_state.last_video = None
+        st.rerun()
+
+
+# ── History ──────────────────────────────────────────────────────────
+if len(st.session_state.history) > 1:
+    st.markdown("---")
+    st.markdown("### 🗂️ History")
+    cols = st.columns(3)
+    for i, item in enumerate(st.session_state.history[:6]):
+        with cols[i % 3]:
+            video_data = item["video"].split(",")[1]
+            st.video(BytesIO(base64.b64decode(video_data)))
+            st.caption(f"{item['prompt'][:30]}... · {item['res']} · {item['dur']}s")
+
+
+# ── Footer ───────────────────────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    '<p style="text-align:center;color:#333;font-size:11px;letter-spacing:2px">VELO 1.2 · BOTDEVELOPMENTAI · POWERED BY Velo 1.2</p>',
+    unsafe_allow_html=True,
+)
