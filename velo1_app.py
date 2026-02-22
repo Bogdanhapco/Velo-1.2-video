@@ -274,7 +274,7 @@ st.markdown(f"""
   <span class="info-chip">🎬 {duration} seconds</span>
   <span class="info-chip">📐 Auto: {res_label}</span>
   <span class="info-chip">🎵 Audio included</span>
-  <span class="info-chip">⚡ LTX-2 distilled FP8</span>
+  <span class="info-chip">⚡ Velo 1.2</span>
 </div>
 """, unsafe_allow_html=True)
 
